@@ -14,29 +14,34 @@ int mem;
 void *pt;
 int buzon;
 
-
+//Structs
 struct persona{
     char nombre;
     char grupo;
 };
 
 struct grupos{
-    struct persona personas[40];
-    int vacio;
-    int contador;
+    struct persona personas[40];    //Ocupa 80 bytes
+    int vacio;                      //Ocupa 4 bytes
+    int contador;                   //Ocupa 4 bytes
 };
 
 void liberar()
 {
-    shmdt(pt);
-    wait(NULL);
-    shmctl(mem, 0, IPC_RMID);
+    puts("Liberando recursos...");
+    //Desvincular memoria compartida
+    if (shmdt(pt) == -1)
+    {
+        perror("Error al liberar memoria compartida");
+    }
+    wait(NULL); //Esperamos a que todos los hijos terminen
+    shmctl(mem, 0, IPC_RMID); //Liberamos memoria compartida
     
-    if (semctl(semaforo, 0, IPC_RMID, 0) == -1)
+    if (semctl(semaforo, 0, IPC_RMID, 0) == -1) //Liberamos semáforo
     {
         perror("Error liberando semáforo");
     }
-    if (msgctl(buzon, 0, IPC_RMID) == -1)
+    if (msgctl(buzon, 0, IPC_RMID) == -1) //Liberamos buzon
     {
         perror("Error liberando buzon");
     }
@@ -46,10 +51,10 @@ void liberar()
 int main(int argc, char const *argv[])
 {
     //COMPROBACION ENTRADA
-    int i;
-    if (argc < 2)
+    int i = 0;
+    if (argc < 2) //Si no se recibe argumento
     {
-        i = 0;
+        i = 0;    //Se inicializa en 0
     }
     else
     {
@@ -59,15 +64,11 @@ int main(int argc, char const *argv[])
             return -1;
         }
     }
-    //MANEJADORA
-    struct sigaction sa;
-    sa.sa_handler = liberar;
-    sigemptyset(&sa.sa_mask);
-    sa.sa_flags = 0;
-    sigaction(SIGINT, &sa, NULL);
+    //MANEJADORA (legal usar signal)
+    signal(SIGINT, &liberar);
 
     //CREACION RECURSOS COMPARTIDOS
-    int mem = shmget(IPC_PRIVATE, sizeof(struct grupos), IPC_CREAT | 0600);
+    int mem = shmget(IPC_PRIVATE, sizeof(struct grupos), IPC_CREAT | 0666);
     void *pt = shmat(mem, 0, 0);
     buzon = msgget(IPC_PRIVATE, IPC_CREAT | 0600);
     if ((semaforo = semget(IPC_PRIVATE, 1, IPC_CREAT | 0600)) == -1)
