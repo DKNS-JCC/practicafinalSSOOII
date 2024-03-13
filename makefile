@@ -12,7 +12,7 @@ LIBS=libcambios.a
 
 # Regla para compilar el programa
 $(TARGET): $(SRCS) $(LIBS)
-	$(CC) $(CFLAGS) $(SRCS) $(LIBS) -o $(TARGET) 
+	$(CC) -m32 $(CFLAGS) $(SRCS) $(LIBS) -o $(TARGET) 
 
 # Regla para limpiar archivos temporales y el ejecutable
 clean:

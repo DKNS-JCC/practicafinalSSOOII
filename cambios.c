@@ -13,48 +13,61 @@ int semaforo;
 int mem;
 void *pt;
 int buzon;
-
-//Structs
-struct persona{
+int ppid;
+// Structs
+struct persona
+{
     char nombre;
     char grupo;
 };
 
-struct grupos{
-    struct persona personas[40];    //Ocupa 80 bytes
-    int vacio;                      //Ocupa 4 bytes
-    int contador;                   //Ocupa 4 bytes
+struct grupos
+{
+    struct persona personas[40]; // Ocupa 80 bytes
+    int vacio;                   // Ocupa 4 bytes
+    int contador;                // Ocupa 4 bytes
 };
 
 void liberar()
 {
     puts("Liberando recursos...");
-    //Desvincular memoria compartida
+    // Desvincular memoria compartida
     if (shmdt(pt) == -1)
     {
         perror("Error al liberar memoria compartida");
     }
-    wait(NULL); //Esperamos a que todos los hijos terminen
-    shmctl(mem, 0, IPC_RMID); //Liberamos memoria compartida
-    
-    if (semctl(semaforo, 0, IPC_RMID, 0) == -1) //Liberamos semáforo
+    // Esperamos a que todos los hijos terminen
+
+    if (ppid == getpid())
     {
-        perror("Error liberando semáforo");
+        for (int i = 0; i < 32; i++)
+        {
+            wait(NULL);
+        }
+
+        shmctl(mem, 0, IPC_RMID); // Liberamos memoria compartida
+
+        if (semctl(semaforo, 0, IPC_RMID, 0) == -1) // Liberamos semáforo
+        {
+            perror("Error liberando semáforo");
+        }
+        if (msgctl(buzon, 0, IPC_RMID) == -1) // Liberamos buzon
+        {
+            perror("Error liberando buzon");
+        }
     }
-    if (msgctl(buzon, 0, IPC_RMID) == -1) //Liberamos buzon
-    {
-        perror("Error liberando buzon");
-    }
+
     exit(0);
 }
 
 int main(int argc, char const *argv[])
 {
-    //COMPROBACION ENTRADA
+    ppid = getgid(); // COJO EL PID DEL PADRE PARA DESPUES EN LA MANEJADORA DIFERENCIAR ENTRE PADRE E HIJO A LA HORA DE ELIMINAR
+    // COMPROBACION ENTRADA
     int i = 0;
-    if (argc < 2) //Si no se recibe argumento
+    if (argc < 2) // Si no se recibe argumento
     {
-        i = 0;    //Se inicializa en 0
+        i = 0; // Se inicializa en 0
     }
     else
     {
@@ -64,12 +77,12 @@ int main(int argc, char const *argv[])
             return -1;
         }
     }
-    //MANEJADORA (legal usar signal)
+    // MANEJADORA (legal usar signal)
     signal(SIGINT, &liberar);
 
-    //CREACION RECURSOS COMPARTIDOS
-    int mem = shmget(IPC_PRIVATE, sizeof(struct grupos), IPC_CREAT | 0666);
-    void *pt = shmat(mem, 0, 0);
+    // CREACION RECURSOS COMPARTIDOS
+    mem = shmget(IPC_PRIVATE, sizeof(struct grupos), IPC_CREAT | 0666);
+    pt = shmat(mem, 0, 0);
     buzon = msgget(IPC_PRIVATE, IPC_CREAT | 0600);
     if ((semaforo = semget(IPC_PRIVATE, 1, IPC_CREAT | 0600)) == -1)
     {
@@ -78,17 +91,20 @@ int main(int argc, char const *argv[])
     }
 
     semctl(semaforo, 0, SETVAL, 0);
-    pid_t pid=1;
-    i=0;    
-    while(i<32&&pid!=0){
-        pid=fork();
+    pid_t pid = 1;
+    i = 0;
+    while (i < 32 && pid != 0)
+    {
+        pid = fork();
         i++;
     }
 
     if (pid == 0)
     {
-        printf("hijo %d",i);
-        
+        printf("hijo %d", i);
+        for (;;)
+        {
+        }
     }
 
     else
@@ -96,10 +112,11 @@ int main(int argc, char const *argv[])
         sleep(1);
         printf("%s \n", (char *)pt);
         inicioCambios(i, semaforo, pt);
-        for(;;){
-
+        for (;;)
+        {
         }
     }
 
+    liberar();
     return 0;
 }
