@@ -40,6 +40,7 @@ void liberar()
 
     if (ppid == getpid())
     {
+       
         for (int i = 0; i < 32; i++)
         {
             wait(NULL);
@@ -62,7 +63,7 @@ void liberar()
 
 int main(int argc, char const *argv[])
 {
-    ppid = getgid(); // COJO EL PID DEL PADRE PARA DESPUES EN LA MANEJADORA DIFERENCIAR ENTRE PADRE E HIJO A LA HORA DE ELIMINAR
+    ppid = getpid(); // COJO EL PID DEL PADRE PARA DESPUES EN LA MANEJADORA DIFERENCIAR ENTRE PADRE E HIJO A LA HORA DE ELIMINAR
     // COMPROBACION ENTRADA
     int i = 0;
     if (argc < 2) // Si no se recibe argumento
