@@ -9,11 +9,13 @@
 #include <string.h>
 #include <sys/wait.h>
 #include <sys/msg.h>
+
 int semaforo;
 int mem;
 void *pt;
 int buzon;
 int ppid;
+
 // Structs
 struct persona
 {
@@ -30,7 +32,6 @@ struct grupos
 
 void liberar()
 {
-    puts("Liberando recursos...");
 
     if (shmdt(pt) == -1)
     {
@@ -42,7 +43,11 @@ void liberar()
 
         for (int i = 0; i < 32; i++)
         {
-            wait(NULL);
+            if (wait(NULL) == -1)
+            {
+                perror("Error en wait");
+                break;
+            }
         }
 
         shmctl(mem, 0, IPC_RMID); // Liberamos memoria compartida
@@ -55,23 +60,33 @@ void liberar()
         {
             perror("Error liberando buzon");
         }
+        puts("recursos liberados");
     }
-
+    
     exit(0);
 }
 
 int main(int argc, char const *argv[])
 {
+    
+
+    struct sembuf operacion[1];
+    operacion[0].sem_num = 0;
+    operacion[0].sem_op = 0;
+    operacion[0].sem_flg = 0;
+
     ppid = getpid();
-    int i = 0;
+    char alonso; //<-- No se usa
+    int speed = 0;
+    int i;
     if (argc < 2) // Si no se recibe argumento
     {
-        i = 0; // Se inicializa en 0
+        speed = 0; // Se inicializa en 0
     }
     else
     {
-        i = atoi(argv[1]);
-        if (i == 0 && *argv[1] != '0')
+        speed = atoi(argv[1]);
+        if (speed == 0 && *argv[1] != '0')
         {
             return -1;
         }
@@ -108,8 +123,8 @@ int main(int argc, char const *argv[])
     }
 
     semctl(semaforo, 0, SETVAL, 0); // Inicializamos semaforo
-
     pid_t pid;
+    inicioCambios(speed, semaforo, pt);
     i = 0;
     for (i = 0; i < 32; i++)
     {
@@ -119,17 +134,47 @@ int main(int argc, char const *argv[])
             break;
         }
     }
-
     if (pid == 0)
     {
+        operacion[0].sem_op = 1;
+        semop(semaforo, operacion, 1);
+        int pos;
+        if (i < 8)
+        {
+            ((struct grupos *)pt)->personas[i].nombre = 'A';
+            ((struct grupos *)pt)->personas[i].grupo = 1;
+            pos=i;
+        }
+        else if (i < 16)
+        {
+            ((struct grupos *)pt)->personas[i+2].nombre = 'B';
+            ((struct grupos *)pt)->personas[i+2].grupo = 2;
+            pos=i+2;
+        }
+        else if (i < 24)
+        {
+            ((struct grupos *)pt)->personas[i+4].nombre = 'C';
+            ((struct grupos *)pt)->personas[i+4].grupo = 3;
+            pos=i+4;
+        }
+        else
+        {
+            ((struct grupos *)pt)->personas[i+6].nombre = 'D';
+            ((struct grupos *)pt)->personas[i+6].grupo = 4;
+            pos=i+6;
+        }
+        refrescar();
+
         for (;;)
         {
         }
+        
     }
 
     else
     {
-        inicioCambios(i, semaforo, pt);
+        operacion[0].sem_op = -32;
+        semop(semaforo, operacion, 1);
         for (;;)
         {
         }
