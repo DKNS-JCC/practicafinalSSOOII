@@ -31,16 +31,15 @@ struct grupos
 void liberar()
 {
     puts("Liberando recursos...");
-    // Desvincular memoria compartida
+
     if (shmdt(pt) == -1)
     {
         perror("Error al liberar memoria compartida");
     }
-    // Esperamos a que todos los hijos terminen
 
     if (ppid == getpid())
     {
-       
+
         for (int i = 0; i < 32; i++)
         {
             wait(NULL);
@@ -63,8 +62,7 @@ void liberar()
 
 int main(int argc, char const *argv[])
 {
-    ppid = getpid(); // COJO EL PID DEL PADRE PARA DESPUES EN LA MANEJADORA DIFERENCIAR ENTRE PADRE E HIJO A LA HORA DE ELIMINAR
-    // COMPROBACION ENTRADA
+    ppid = getpid();
     int i = 0;
     if (argc < 2) // Si no se recibe argumento
     {
@@ -81,28 +79,49 @@ int main(int argc, char const *argv[])
     // MANEJADORA (legal usar signal)
     signal(SIGINT, &liberar);
 
-    // CREACION RECURSOS COMPARTIDOS
-    mem = shmget(IPC_PRIVATE, sizeof(struct grupos), IPC_CREAT | 0666);
-    pt = shmat(mem, 0, 0);
-    buzon = msgget(IPC_PRIVATE, IPC_CREAT | 0600);
-    if ((semaforo = semget(IPC_PRIVATE, 1, IPC_CREAT | 0600)) == -1)
+    // Declarar IPCS
+
+    if ((mem = shmget(IPC_PRIVATE, sizeof(struct grupos), IPC_CREAT | 0600)) == -1) // Creamos memoria compartida
     {
-        printf("ERROR AL CREAR SEMAFORO");
+        perror("ERROR AL CREAR MEMORIA COMPARTIDA");
+        exit(0);
+    }
+    pt = shmat(mem, 0, 0); // Asignamos memoria compartida
+
+    if ((buzon = msgget(IPC_PRIVATE, IPC_CREAT | 0600)) == -1) // Creamos buzon
+    {
+        perror("ERROR AL CREAR BUZON");
+        // liberar lo creado
+        shmdt(pt);
+        shmctl(mem, 0, IPC_RMID);
         exit(0);
     }
 
-    semctl(semaforo, 0, SETVAL, 0);
-    pid_t pid = 1;
+    if ((semaforo = semget(IPC_PRIVATE, 1, IPC_CREAT | 0600)) == -1) // Creamos semaforo
+    {
+        perror("ERROR AL CREAR SEMAFORO");
+        // liberar lo creado
+        shmdt(pt);
+        shmctl(mem, 0, IPC_RMID);
+        msgctl(buzon, 0, IPC_RMID);
+        exit(0);
+    }
+
+    semctl(semaforo, 0, SETVAL, 0); // Inicializamos semaforo
+
+    pid_t pid;
     i = 0;
-    while (i < 32 && pid != 0)
+    for (i = 0; i < 32; i++)
     {
         pid = fork();
-        i++;
+        if (pid == 0)
+        {
+            break;
+        }
     }
 
     if (pid == 0)
     {
-        printf("hijo %d", i);
         for (;;)
         {
         }
@@ -110,8 +129,6 @@ int main(int argc, char const *argv[])
 
     else
     {
-        sleep(1);
-        printf("%s \n", (char *)pt);
         inicioCambios(i, semaforo, pt);
         for (;;)
         {
