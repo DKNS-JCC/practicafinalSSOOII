@@ -17,7 +17,7 @@ int buzon;
 int ppid;
 
 // Structs
-struct persona  // Ocupa 2 bytes
+struct persona // Ocupa 2 bytes
 {
     char nombre;
     char grupo;
@@ -33,11 +33,6 @@ struct grupos
 void liberar()
 {
 
-    if (shmdt(pt) == -1)
-    {
-        perror("Error al liberar memoria compartida");
-    }
-
     if (ppid == getpid())
     {
 
@@ -48,6 +43,13 @@ void liberar()
                 perror("Error en wait");
                 break;
             }
+        }
+
+        finCambios();
+        if (shmdt(pt) == -1)
+
+        {
+            perror("Error al liberar memoria compartida");
         }
 
         shmctl(mem, 0, IPC_RMID); // Liberamos memoria compartida
@@ -62,14 +64,21 @@ void liberar()
         }
         puts("recursos liberados");
     }
-    
+    else
+    {
+        if (shmdt(pt) == -1)
+        {
+            perror("Error al liberar memoria compartida");
+        }
+    }
+
     exit(0);
 }
 
 int main(int argc, char const *argv[])
 {
 
-    typedef struct mensaje 
+    typedef struct mensaje
     {
         long tipo;
         char mensaje[100];
@@ -77,9 +86,7 @@ int main(int argc, char const *argv[])
 
     mensaje msg;
 
-    
-    
-    char nombres [32]= {'A','B','C','D','E','F','G','H','I','J','L','M','N','O','P','R','a','b','c','d','e','f','g','h','i','j','l','m','n','o','p','r'};
+    char nombres[32] = {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'L', 'M', 'N', 'O', 'P', 'R', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'l', 'm', 'n', 'o', 'p', 'r'};
     struct sembuf operacion[1];
     operacion[0].sem_num = 0;
     operacion[0].sem_op = 0;
@@ -92,17 +99,23 @@ int main(int argc, char const *argv[])
     if (argc < 2)
     {
         speed = 0;
+        alarm(6);
     }
     else
     {
         speed = atoi(argv[1]);
-        if (speed == 0 && *argv[1] != '0')
+        if (speed == 0)
         {
-            return -1;
+            alarm(20);
+        }
+        else
+        {
+            alarm(30);
         }
     }
-    // MANEJADORA 
+    // MANEJADORA
     signal(SIGINT, &liberar);
+    signal(SIGALRM, &liberar);
 
     // Declarar IPCS
     if ((mem = shmget(IPC_PRIVATE, sizeof(struct grupos), IPC_CREAT | 0600)) == -1) // Creamos memoria compartida
@@ -133,14 +146,13 @@ int main(int argc, char const *argv[])
 
     semctl(semaforo, 0, SETVAL, 0); // Inicializamos semaforo
     pid_t pid;
-    ((struct grupos *)pt)->personas[8].nombre =  ((struct grupos *)pt)->personas[9].nombre =  
-    ((struct grupos *)pt)->personas[18].nombre =  ((struct grupos *)pt)->personas[19].nombre = 
-    ((struct grupos *)pt)->personas[28].nombre =  ((struct grupos *)pt)->personas[29].nombre = 
-    ((struct grupos *)pt)->personas[38].nombre =  ((struct grupos *)pt)->personas[39].nombre = ' ';
+    ((struct grupos *)pt)->personas[8].nombre = ((struct grupos *)pt)->personas[9].nombre =
+        ((struct grupos *)pt)->personas[18].nombre = ((struct grupos *)pt)->personas[19].nombre =
+            ((struct grupos *)pt)->personas[28].nombre = ((struct grupos *)pt)->personas[29].nombre =
+                ((struct grupos *)pt)->personas[38].nombre = ((struct grupos *)pt)->personas[39].nombre = ' ';
     inicioCambios(speed, semaforo, pt);
     i = 0;
     char nombre;
-    
 
     for (i = 0; i < 32; i++)
     {
@@ -152,7 +164,6 @@ int main(int argc, char const *argv[])
         }
     }
 
-
     if (pid == 0)
     {
         operacion[0].sem_op = 1;
@@ -161,30 +172,30 @@ int main(int argc, char const *argv[])
         {
             ((struct grupos *)pt)->personas[i].nombre = nombre;
             ((struct grupos *)pt)->personas[i].grupo = 1;
-            pos=i;
+            pos = i;
         }
         else if (i < 16)
         {
-            ((struct grupos *)pt)->personas[i+2].nombre = nombre;
-            ((struct grupos *)pt)->personas[i+2].grupo = 2;
-            pos=i+2;
+            ((struct grupos *)pt)->personas[i + 2].nombre = nombre;
+            ((struct grupos *)pt)->personas[i + 2].grupo = 2;
+            pos = i + 2;
         }
         else if (i < 24)
         {
-            ((struct grupos *)pt)->personas[i+4].nombre = nombre;
-            ((struct grupos *)pt)->personas[i+4].grupo = 3;
-            pos=i+4;
+            ((struct grupos *)pt)->personas[i + 4].nombre = nombre;
+            ((struct grupos *)pt)->personas[i + 4].grupo = 3;
+            pos = i + 4;
         }
         else
         {
-            ((struct grupos *)pt)->personas[i+6].nombre = nombre;
-            ((struct grupos *)pt)->personas[i+6].grupo = 4;
-            pos=i+6;
+            ((struct grupos *)pt)->personas[i + 6].nombre = nombre;
+            ((struct grupos *)pt)->personas[i + 6].grupo = 4;
+            pos = i + 6;
         }
-        ((struct grupos *)pt)->personas[pos].grupo=aQuEGrupo(pos/10+1);
+
         semop(semaforo, operacion, 1);
-        
-        
+
+        ((struct grupos *)pt)->personas[pos].grupo = aQuEGrupo(pos / 10 + 1);
     }
 
     else
@@ -198,4 +209,3 @@ int main(int argc, char const *argv[])
     liberar();
     return 0;
 }
-
