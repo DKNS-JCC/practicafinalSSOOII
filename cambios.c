@@ -17,7 +17,7 @@ int buzon;
 int ppid;
 
 // Structs
-struct persona
+struct persona  // Ocupa 2 bytes
 {
     char nombre;
     char grupo;
@@ -68,20 +68,30 @@ void liberar()
 
 int main(int argc, char const *argv[])
 {
-    
 
+    typedef struct mensaje 
+    {
+        long tipo;
+        char mensaje[100];
+    } mensaje;
+
+    mensaje msg;
+
+    
+    
+    char nombres [32]= {'A','B','C','D','E','F','G','H','I','J','L','M','N','O','P','R','a','b','c','d','e','f','g','h','i','j','l','m','n','o','p','r'};
     struct sembuf operacion[1];
     operacion[0].sem_num = 0;
     operacion[0].sem_op = 0;
     operacion[0].sem_flg = 0;
 
     ppid = getpid();
-    char alonso; //<-- No se usa
+    char alonso = 'A'; //<-- No se usa
     int speed = 0;
     int i;
-    if (argc < 2) // Si no se recibe argumento
+    if (argc < 2)
     {
-        speed = 0; // Se inicializa en 0
+        speed = 0;
     }
     else
     {
@@ -91,11 +101,10 @@ int main(int argc, char const *argv[])
             return -1;
         }
     }
-    // MANEJADORA (legal usar signal)
+    // MANEJADORA 
     signal(SIGINT, &liberar);
 
     // Declarar IPCS
-
     if ((mem = shmget(IPC_PRIVATE, sizeof(struct grupos), IPC_CREAT | 0600)) == -1) // Creamos memoria compartida
     {
         perror("ERROR AL CREAR MEMORIA COMPARTIDA");
@@ -124,50 +133,57 @@ int main(int argc, char const *argv[])
 
     semctl(semaforo, 0, SETVAL, 0); // Inicializamos semaforo
     pid_t pid;
+    ((struct grupos *)pt)->personas[8].nombre =  ((struct grupos *)pt)->personas[9].nombre =  
+    ((struct grupos *)pt)->personas[18].nombre =  ((struct grupos *)pt)->personas[19].nombre = 
+    ((struct grupos *)pt)->personas[28].nombre =  ((struct grupos *)pt)->personas[29].nombre = 
+    ((struct grupos *)pt)->personas[38].nombre =  ((struct grupos *)pt)->personas[39].nombre = ' ';
     inicioCambios(speed, semaforo, pt);
     i = 0;
+    char nombre;
+    
+
     for (i = 0; i < 32; i++)
     {
         pid = fork();
         if (pid == 0)
         {
+            nombre = nombres[i];
             break;
         }
     }
+
+
     if (pid == 0)
     {
         operacion[0].sem_op = 1;
-        semop(semaforo, operacion, 1);
         int pos;
         if (i < 8)
         {
-            ((struct grupos *)pt)->personas[i].nombre = 'A';
+            ((struct grupos *)pt)->personas[i].nombre = nombre;
             ((struct grupos *)pt)->personas[i].grupo = 1;
             pos=i;
         }
         else if (i < 16)
         {
-            ((struct grupos *)pt)->personas[i+2].nombre = 'B';
+            ((struct grupos *)pt)->personas[i+2].nombre = nombre;
             ((struct grupos *)pt)->personas[i+2].grupo = 2;
             pos=i+2;
         }
         else if (i < 24)
         {
-            ((struct grupos *)pt)->personas[i+4].nombre = 'C';
+            ((struct grupos *)pt)->personas[i+4].nombre = nombre;
             ((struct grupos *)pt)->personas[i+4].grupo = 3;
             pos=i+4;
         }
         else
         {
-            ((struct grupos *)pt)->personas[i+6].nombre = 'D';
+            ((struct grupos *)pt)->personas[i+6].nombre = nombre;
             ((struct grupos *)pt)->personas[i+6].grupo = 4;
             pos=i+6;
         }
-        refrescar();
-
-        for (;;)
-        {
-        }
+        ((struct grupos *)pt)->personas[pos].grupo=aQuEGrupo(pos/10+1);
+        semop(semaforo, operacion, 1);
+        
         
     }
 
@@ -175,11 +191,11 @@ int main(int argc, char const *argv[])
     {
         operacion[0].sem_op = -32;
         semop(semaforo, operacion, 1);
-        for (;;)
-        {
-        }
+        refrescar();
+        msgrcv(buzon, &msg, sizeof(mensaje), 0, 0);
     }
 
     liberar();
     return 0;
 }
+
