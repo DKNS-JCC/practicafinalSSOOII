@@ -86,7 +86,7 @@ int main(int argc, char const *argv[])
 
     mensaje msg;
 
-    char nombres[32] = {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'L', 'M', 'N', 'O', 'P', 'R', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'l', 'm', 'n', 'o', 'p', 'r'};
+    char nombres[32] = {'A', 'B', 'C', 'D', 'a', 'b', 'c', 'd','E', 'F', 'G', 'H','e' ,'f', 'g', 'h', 'I', 'J', 'L', 'M', 'i', 'j', 'l', 'm', 'N', 'O', 'P', 'R', 'n', 'o', 'p', 'r'};
     struct sembuf operacion[1];
     operacion[0].sem_num = 0;
     operacion[0].sem_op = 0;
@@ -145,11 +145,14 @@ int main(int argc, char const *argv[])
     }
 
     semctl(semaforo, 0, SETVAL, 0); // Inicializamos semaforo
+    
     pid_t pid;
+
     ((struct grupos *)pt)->personas[8].nombre = ((struct grupos *)pt)->personas[9].nombre =
         ((struct grupos *)pt)->personas[18].nombre = ((struct grupos *)pt)->personas[19].nombre =
             ((struct grupos *)pt)->personas[28].nombre = ((struct grupos *)pt)->personas[29].nombre =
                 ((struct grupos *)pt)->personas[38].nombre = ((struct grupos *)pt)->personas[39].nombre = ' ';
+
     inicioCambios(speed, semaforo, pt);
     i = 0;
     char nombre;
