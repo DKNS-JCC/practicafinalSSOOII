@@ -35,13 +35,13 @@ void liberar()
 
     if (ppid == getpid())
     {
+        puts("PADRE RECIBE");
 
         for (int i = 0; i < 32; i++)
         {
             if (wait(NULL) == -1)
             {
                 perror("Error en wait");
-                break;
             }
         }
 
@@ -62,7 +62,6 @@ void liberar()
         {
             perror("Error liberando buzon");
         }
-        puts("recursos liberados");
     }
     else
     {
@@ -71,7 +70,7 @@ void liberar()
             perror("Error al liberar memoria compartida");
         }
     }
-
+    puts("HIJO RECIBE");
     exit(0);
 }
 
@@ -86,7 +85,7 @@ int main(int argc, char const *argv[])
 
     mensaje msg;
 
-    char nombres[32] = {'A', 'B', 'C', 'D', 'a', 'b', 'c', 'd','E', 'F', 'G', 'H','e' ,'f', 'g', 'h', 'I', 'J', 'L', 'M', 'i', 'j', 'l', 'm', 'N', 'O', 'P', 'R', 'n', 'o', 'p', 'r'};
+    char nombres[32] = {'A', 'B', 'C', 'D', 'a', 'b', 'c', 'd', 'E', 'F', 'G', 'H', 'e', 'f', 'g', 'h', 'I', 'J', 'L', 'M', 'i', 'j', 'l', 'm', 'N', 'O', 'P', 'R', 'n', 'o', 'p', 'r'};
     struct sembuf operacion[1];
     operacion[0].sem_num = 0;
     operacion[0].sem_op = 0;
@@ -106,11 +105,11 @@ int main(int argc, char const *argv[])
         speed = atoi(argv[1]);
         if (speed == 0)
         {
-            alarm(20);
+            alarm(6);
         }
         else
         {
-            alarm(30);
+            alarm(6);
         }
     }
     // MANEJADORA
@@ -145,7 +144,7 @@ int main(int argc, char const *argv[])
     }
 
     semctl(semaforo, 0, SETVAL, 0); // Inicializamos semaforo
-    
+
     pid_t pid;
 
     ((struct grupos *)pt)->personas[8].nombre = ((struct grupos *)pt)->personas[9].nombre =
@@ -197,16 +196,102 @@ int main(int argc, char const *argv[])
         }
 
         semop(semaforo, operacion, 1);
+        while (1)
+        {
+            ((struct grupos *)pt)->personas[pos].grupo = aQuEGrupo(pos / 10 + 1);
 
-        ((struct grupos *)pt)->personas[pos].grupo = aQuEGrupo(pos / 10 + 1);
+            switch (pos / 10 + 1)
+            {
+            case 1:
+                switch (((struct grupos *)pt)->personas[pos].grupo)
+                {
+                case 2:
+                    msg.tipo = 1;
+                    break;
+                case 3:
+                    msg.tipo = 2;
+                    break;
+                case 4:
+                    msg.tipo = 3;
+                    break;
+                }
+                break;
+            case 2:
+                switch (((struct grupos *)pt)->personas[pos].grupo)
+                {
+                case 1:
+                    msg.tipo = 12;
+                    break;
+                case 3:
+                    msg.tipo = 4;
+                    break;
+                case 4:
+                    msg.tipo = 5;
+                    break;
+                }
+                break;
+            case 3:
+                switch (((struct grupos *)pt)->personas[pos].grupo)
+                {
+                case 1:
+                    msg.tipo = 11;
+                    break;
+                case 2:
+                    msg.tipo = 9;
+                    break;
+                case 4:
+                    msg.tipo = 6;
+                    break;
+                }
+                break;
+            case 4:
+                switch (((struct grupos *)pt)->personas[pos].grupo)
+                {
+                case 1:
+                    msg.tipo = 10;
+                    break;
+                case 2:
+                    msg.tipo = 8;
+                    break;
+                case 3:
+                    msg.tipo = 7;
+                    break;
+                }
+                break;
+            }
+            msgsnd(buzon, &msg, sizeof(mensaje) - sizeof(long), IPC_NOWAIT);
+            msgrcv(buzon, &msg, sizeof(mensaje) - sizeof(long), msg.tipo + 12, IPC_NOWAIT);
+        }
     }
-
     else
     {
         operacion[0].sem_op = -32;
         semop(semaforo, operacion, 1);
-        refrescar();
-        msgrcv(buzon, &msg, sizeof(mensaje), 0, 0);
+        int solicitudes[13];
+        for (int i = 1; i < 13; i++)
+        {
+            solicitudes[i] = 0;
+        }
+        int contrario;
+        while (1)
+        {
+            refrescar();
+            msgrcv(buzon, &msg, sizeof(mensaje) - sizeof(long), 0, 0);
+            contrario = 13 - msg.tipo;
+
+            if (solicitudes[contrario] > 0)
+            {
+                solicitudes[contrario]--;
+                msg.tipo = 12 + msg.tipo;
+                msgsnd(buzon, &msg, sizeof(mensaje) - sizeof(long), IPC_NOWAIT);
+                msg.tipo = contrario + 12;
+                msgsnd(buzon, &msg, sizeof(mensaje) - sizeof(long), IPC_NOWAIT);
+            }
+            else
+            {
+                solicitudes[msg.tipo]++;
+            }
+        }
     }
 
     liberar();
