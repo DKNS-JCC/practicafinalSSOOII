@@ -15,7 +15,7 @@ int semaforo;
 int mem;
 void *pt;
 int buzon;
-int ppid;
+int pids[33];
 
 // Structs
 struct persona // Ocupa 2 bytes
@@ -28,16 +28,21 @@ struct grupos
 {
     struct persona personas[40]; // Ocupa 80 bytes
     int vacio;                   // Ocupa 4 bytes
-    int contador;                // Ocupa 4 bytes
+    int contador;             // Ocupa 4 bytes
 };
 
 void liberar()
 {
     puts("Alarma!!!");
     // AQUI ENTRA
-    if (ppid == getpid())
+    if (pids[32] == getpid())
     {
-
+        
+        
+        for (int i = 0; i < 32; i++)
+        {
+            kill(pids[i],SIGINT);
+        }
         for (int i = 0; i < 32; i++)
         {
             if (wait(NULL) == -1)
@@ -46,7 +51,7 @@ void liberar()
             }
         }
 
-        finCambios();
+        
         if (shmdt(pt) == -1)
         {
             perror("Error al liberar memoria compartida");
@@ -75,7 +80,7 @@ void liberar()
 
 int main(int argc, char const *argv[])
 {
-
+    
     typedef struct mensaje
     {
         long tipo;
@@ -83,14 +88,14 @@ int main(int argc, char const *argv[])
     } mensaje;
 
     mensaje msg;
-
+    
     char nombres[32] = {'A', 'B', 'C', 'D', 'a', 'b', 'c', 'd', 'E', 'F', 'G', 'H', 'e', 'f', 'g', 'h', 'I', 'J', 'L', 'M', 'i', 'j', 'l', 'm', 'N', 'O', 'P', 'R', 'n', 'o', 'p', 'r'};
     struct sembuf operacion[1];
     operacion[0].sem_num = 0;
     operacion[0].sem_op = 0;
     operacion[0].sem_flg = 0;
 
-    ppid = getpid();
+    pids[32] = getpid();
     char alonso = 'A'; //<-- No se usa
     int speed = 0;
     int i;
@@ -150,7 +155,7 @@ int main(int argc, char const *argv[])
     semctl(semaforo, 0, SETVAL, 0);
 
     pid_t pid;
-
+    
     ((struct grupos *)pt)->personas[8].nombre = ((struct grupos *)pt)->personas[9].nombre =
         ((struct grupos *)pt)->personas[18].nombre = ((struct grupos *)pt)->personas[19].nombre =
             ((struct grupos *)pt)->personas[28].nombre = ((struct grupos *)pt)->personas[29].nombre =
@@ -163,8 +168,8 @@ int main(int argc, char const *argv[])
     // Crear procesos hijos
     for (i = 0; i < 32; i++)
     {
-        pid = fork();
-        if (pid == 0)
+        pids[i] = fork();
+        if (pids[i] == 0)
         {
             nombre = nombres[i];
             break;
@@ -172,7 +177,7 @@ int main(int argc, char const *argv[])
     }
 
     // Asignar grupos y nombres
-    if (pid == 0)
+    if (pids[32] != getpid())
     {
         operacion[0].sem_op = 1;
         int pos;
