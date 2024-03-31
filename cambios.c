@@ -9,6 +9,7 @@
 #include <string.h>
 #include <sys/wait.h>
 #include <sys/msg.h>
+#include <errno.h>
 
 int semaforo;
 int mem;
@@ -32,10 +33,10 @@ struct grupos
 
 void liberar()
 {
-
+    puts("Alarma!!!");
+    // AQUI ENTRA
     if (ppid == getpid())
     {
-        puts("PADRE RECIBE");
 
         for (int i = 0; i < 32; i++)
         {
@@ -47,7 +48,6 @@ void liberar()
 
         finCambios();
         if (shmdt(pt) == -1)
-
         {
             perror("Error al liberar memoria compartida");
         }
@@ -70,7 +70,6 @@ void liberar()
             perror("Error al liberar memoria compartida");
         }
     }
-    puts("HIJO RECIBE");
     exit(0);
 }
 
@@ -112,7 +111,8 @@ int main(int argc, char const *argv[])
             alarm(6);
         }
     }
-    // MANEJADORA
+
+    // Manejadoras
     signal(SIGINT, &liberar);
     signal(SIGALRM, &liberar);
 
@@ -122,12 +122,15 @@ int main(int argc, char const *argv[])
         perror("ERROR AL CREAR MEMORIA COMPARTIDA");
         exit(0);
     }
-    pt = shmat(mem, 0, 0); // Asignamos memoria compartida
 
-    if ((buzon = msgget(IPC_PRIVATE, IPC_CREAT | 0600)) == -1) // Creamos buzon
+    // Asignamos memoria compartida
+    pt = shmat(mem, 0, 0);
+
+    // Creamos buzon
+    if ((buzon = msgget(IPC_PRIVATE, IPC_CREAT | 0600)) == -1)
     {
         perror("ERROR AL CREAR BUZON");
-        // liberar lo creado
+
         shmdt(pt);
         shmctl(mem, 0, IPC_RMID);
         exit(0);
@@ -136,14 +139,15 @@ int main(int argc, char const *argv[])
     if ((semaforo = semget(IPC_PRIVATE, 1, IPC_CREAT | 0600)) == -1) // Creamos semaforo
     {
         perror("ERROR AL CREAR SEMAFORO");
-        // liberar lo creado
+
         shmdt(pt);
         shmctl(mem, 0, IPC_RMID);
         msgctl(buzon, 0, IPC_RMID);
         exit(0);
     }
 
-    semctl(semaforo, 0, SETVAL, 0); // Inicializamos semaforo
+    // Inicializamos semaforo
+    semctl(semaforo, 0, SETVAL, 0);
 
     pid_t pid;
 
@@ -156,6 +160,7 @@ int main(int argc, char const *argv[])
     i = 0;
     char nombre;
 
+    // Crear procesos hijos
     for (i = 0; i < 32; i++)
     {
         pid = fork();
@@ -166,6 +171,7 @@ int main(int argc, char const *argv[])
         }
     }
 
+    // Asignar grupos y nombres
     if (pid == 0)
     {
         operacion[0].sem_op = 1;
@@ -259,8 +265,27 @@ int main(int argc, char const *argv[])
                 }
                 break;
             }
-            msgsnd(buzon, &msg, sizeof(mensaje) - sizeof(long), IPC_NOWAIT);
-            msgrcv(buzon, &msg, sizeof(mensaje) - sizeof(long), msg.tipo + 12, IPC_NOWAIT);
+
+            //==============================================================
+            //   AQUI SE QUEDA BLOQUEADO ENVIANDO MENSAJES INFINITAMENTE
+            //==============================================================
+
+            // Enviar mensaje solicitando cambio
+            if (msgsnd(buzon, &msg, sizeof(struct mensaje) - sizeof(long), IPC_NOWAIT) == -1)
+            {
+                perror("Error al enviar el mensaje");
+                exit(1);
+            }
+            // Recibir mensaje bloqueante
+            if (msgrcv(buzon, &msg, sizeof(struct mensaje) - sizeof(long), msg.tipo + 12, 0) == -1)
+            {    
+                    perror("Error al recibir el mensaje");
+                    exit(1);
+            }
+            else
+            {
+                //hacer algo con el mensaje
+            }
         }
     }
     else
