@@ -50,7 +50,7 @@ void liberar()
             }
         }
 
-        printf ("%d", finCambios());
+        printf("%d", finCambios());
 
         if (shmdt(pt) == -1)
         {
@@ -85,7 +85,8 @@ int main(int argc, char const *argv[])
     typedef struct mensaje
     {
         long tipo;
-        char mensaje[100];
+        int origen;
+        int destino;
     } mensaje;
 
     mensaje msg;
@@ -225,6 +226,8 @@ int main(int argc, char const *argv[])
         while (1)
         {
             ((struct grupos *)pt)->personas[pos].grupo = aQuEGrupo(pos / 10 + 1);
+            msg.origen = pos / 10;
+            msg.destino = ((struct grupos *)pt)->personas[pos].grupo - 1;
 
             switch (pos / 10 + 1)
             {
@@ -246,13 +249,13 @@ int main(int argc, char const *argv[])
                 switch (((struct grupos *)pt)->personas[pos].grupo)
                 {
                 case 1:
-                    msg.tipo = 12;
+                    msg.tipo = 10;
                     break;
                 case 3:
-                    msg.tipo = 4;
+                    msg.tipo = 12;
                     break;
                 case 4:
-                    msg.tipo = 5;
+                    msg.tipo = 13;
                     break;
                 }
                 break;
@@ -260,13 +263,13 @@ int main(int argc, char const *argv[])
                 switch (((struct grupos *)pt)->personas[pos].grupo)
                 {
                 case 1:
-                    msg.tipo = 11;
+                    msg.tipo = 20;
                     break;
                 case 2:
-                    msg.tipo = 9;
+                    msg.tipo = 21;
                     break;
                 case 4:
-                    msg.tipo = 6;
+                    msg.tipo = 23;
                     break;
                 }
                 break;
@@ -274,13 +277,13 @@ int main(int argc, char const *argv[])
                 switch (((struct grupos *)pt)->personas[pos].grupo)
                 {
                 case 1:
-                    msg.tipo = 10;
+                    msg.tipo = 30;
                     break;
                 case 2:
-                    msg.tipo = 8;
+                    msg.tipo = 31;
                     break;
                 case 3:
-                    msg.tipo = 7;
+                    msg.tipo = 32;
                     break;
                 }
                 break;
@@ -293,7 +296,7 @@ int main(int argc, char const *argv[])
                 exit(1);
             }
             // Recibir mensaje bloqueante
-            if (msgrcv(buzon, &msg, sizeof(struct mensaje) - sizeof(long), msg.tipo + 12, 0) == -1)
+            if (msgrcv(buzon, &msg, sizeof(struct mensaje) - sizeof(long), msg.tipo + 100, 0) == -1)
             {
                 perror("Error al recibir el mensaje");
                 exit(1);
@@ -324,7 +327,7 @@ int main(int argc, char const *argv[])
             }
         }
     }
-    else
+    else // Proceso padre
     {
         operacion[0].sem_op = -32;
         semop(semaforo, operacion, 1);
@@ -334,30 +337,72 @@ int main(int argc, char const *argv[])
             operacion[0].sem_num = i;
             semop(semaforo, operacion, 1);
         }
-        int solicitudes[13];
-        for (int i = 1; i < 13; i++)
+        int solicitudes[4][4];
+        for (int i = 0; i < 4; i++)
         {
-            solicitudes[i] = 0;
+            for (int j = 0; j < 4; j++)
+            {
+                solicitudes[i][j] = 0;
+            }
         }
-        int contrario;
+        int contador=0;
+        int multiple[4]={0,0,0,0};
+        int fila=0;
+        int bandera = 0;
         while (1)
         {
             refrescar();
             msgrcv(buzon, &msg, sizeof(mensaje) - sizeof(long), 0, 0);
-            contrario = 13 - msg.tipo;
-
-            if (solicitudes[contrario] > 0)
+            solicitudes[msg.origen][msg.destino]++;
+            if (solicitudes[msg.destino][msg.origen] != 0)
             {
-                solicitudes[contrario]--;
-                msg.tipo = 12 + msg.tipo;
+
+                solicitudes[msg.origen][msg.destino]--;
+                msg.tipo += 100;
                 msgsnd(buzon, &msg, sizeof(mensaje) - sizeof(long), IPC_NOWAIT);
-                msg.tipo = contrario + 12;
+
+                solicitudes[msg.destino][msg.origen]--;
+                msg.tipo = msg.destino * 10 + msg.origen;
+                msg.tipo += 100;
                 msgsnd(buzon, &msg, sizeof(mensaje) - sizeof(long), IPC_NOWAIT);
             }
             else
             {
-                solicitudes[msg.tipo]++;
+                fila = msg.origen;
+                while (contador < 4)
+                {
+                    for (int j = 0; j < 4; j++)
+                    {
+                        
+                        if (solicitudes[fila][j] != 0)
+                        {
+                            multiple[contador] = fila * 10 + j;
+                            fila = j;
+                            if (j == msg.origen)
+                            {
+                                bandera = 0;
+                            }
+                            break;
+                        }
+                    }
+                    if (bandera == 0)
+                    {
+                        break;
+                    }
+                    contador++;
+                }
+                if (bandera == 0)
+                {
+                    for (int i = 0; i <= contador; i++)
+                    {
+                        msg.tipo = multiple[i]+100;
+                        solicitudes[multiple[i] / 10][multiple[i] % 10]--;
+                        msgsnd(buzon, &msg, sizeof(mensaje) - sizeof(long), IPC_NOWAIT);
+                    }
+                }
             }
+            bandera = 1;
+            contador = 0;
         }
     }
 
