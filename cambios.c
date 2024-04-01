@@ -17,6 +17,8 @@ void *pt;
 int buzon;
 int pids[33];
 
+void liberar();
+
 // Structs
 struct persona // Ocupa 2 bytes
 {
@@ -28,20 +30,17 @@ struct grupos
 {
     struct persona personas[40]; // Ocupa 80 bytes
     int vacio;                   // Ocupa 4 bytes
-    int contador;             // Ocupa 4 bytes
+    int contador;                // Ocupa 4 bytes
 };
 
 void liberar()
 {
-    puts("Alarma!!!");
-    // AQUI ENTRA
     if (pids[32] == getpid())
     {
-        
-        
+
         for (int i = 0; i < 32; i++)
         {
-            kill(pids[i],SIGINT);
+            kill(pids[i], SIGINT);
         }
         for (int i = 0; i < 32; i++)
         {
@@ -51,7 +50,8 @@ void liberar()
             }
         }
 
-        
+        printf ("%d", finCambios());
+
         if (shmdt(pt) == -1)
         {
             perror("Error al liberar memoria compartida");
@@ -78,9 +78,10 @@ void liberar()
     exit(0);
 }
 
+//==============================================================================
 int main(int argc, char const *argv[])
 {
-    
+
     typedef struct mensaje
     {
         long tipo;
@@ -88,12 +89,22 @@ int main(int argc, char const *argv[])
     } mensaje;
 
     mensaje msg;
-    
+
     char nombres[32] = {'A', 'B', 'C', 'D', 'a', 'b', 'c', 'd', 'E', 'F', 'G', 'H', 'e', 'f', 'g', 'h', 'I', 'J', 'L', 'M', 'i', 'j', 'l', 'm', 'N', 'O', 'P', 'R', 'n', 'o', 'p', 'r'};
     struct sembuf operacion[1];
     operacion[0].sem_num = 0;
     operacion[0].sem_op = 0;
     operacion[0].sem_flg = 0;
+
+    struct sembuf wait[1];
+    wait[0].sem_num = 0;
+    wait[0].sem_op = -1;
+    wait[0].sem_flg = 0;
+
+    struct sembuf singal[1];
+    singal[0].sem_num = 0;
+    singal[0].sem_op = 1;
+    singal[0].sem_flg = 0;
 
     pids[32] = getpid();
     char alonso = 'A'; //<-- No se usa
@@ -102,18 +113,18 @@ int main(int argc, char const *argv[])
     if (argc < 2)
     {
         speed = 0;
-        alarm(6);
+        alarm(20);
     }
     else
     {
         speed = atoi(argv[1]);
         if (speed == 0)
         {
-            alarm(6);
+            alarm(30);
         }
         else
         {
-            alarm(6);
+            alarm(30);
         }
     }
 
@@ -141,7 +152,7 @@ int main(int argc, char const *argv[])
         exit(0);
     }
 
-    if ((semaforo = semget(IPC_PRIVATE, 1, IPC_CREAT | 0600)) == -1) // Creamos semaforo
+    if ((semaforo = semget(IPC_PRIVATE, 5, IPC_CREAT | 0600)) == -1) // Creamos semaforo
     {
         perror("ERROR AL CREAR SEMAFORO");
 
@@ -153,9 +164,13 @@ int main(int argc, char const *argv[])
 
     // Inicializamos semaforo
     semctl(semaforo, 0, SETVAL, 0);
+    semctl(semaforo, 1, SETVAL, 0);
+    semctl(semaforo, 2, SETVAL, 0);
+    semctl(semaforo, 3, SETVAL, 0);
+    semctl(semaforo, 4, SETVAL, 1);
 
     pid_t pid;
-    
+
     ((struct grupos *)pt)->personas[8].nombre = ((struct grupos *)pt)->personas[9].nombre =
         ((struct grupos *)pt)->personas[18].nombre = ((struct grupos *)pt)->personas[19].nombre =
             ((struct grupos *)pt)->personas[28].nombre = ((struct grupos *)pt)->personas[29].nombre =
@@ -271,10 +286,6 @@ int main(int argc, char const *argv[])
                 break;
             }
 
-            //==============================================================
-            //   AQUI SE QUEDA BLOQUEADO ENVIANDO MENSAJES INFINITAMENTE
-            //==============================================================
-
             // Enviar mensaje solicitando cambio
             if (msgsnd(buzon, &msg, sizeof(struct mensaje) - sizeof(long), IPC_NOWAIT) == -1)
             {
@@ -283,13 +294,33 @@ int main(int argc, char const *argv[])
             }
             // Recibir mensaje bloqueante
             if (msgrcv(buzon, &msg, sizeof(struct mensaje) - sizeof(long), msg.tipo + 12, 0) == -1)
-            {    
-                    perror("Error al recibir el mensaje");
-                    exit(1);
+            {
+                perror("Error al recibir el mensaje");
+                exit(1);
             }
             else
             {
-                //hacer algo con el mensaje
+                wait[0].sem_num = ((struct grupos *)pt)->personas[pos].grupo - 1;
+                singal[0].sem_num = ((struct grupos *)pt)->personas[pos].grupo - 1;
+                semop(semaforo, wait, 1);
+                for (int i = ((struct grupos *)pt)->personas[pos].grupo * 10 - 10; i < ((struct grupos *)pt)->personas[pos].grupo * 10; i++)
+                {
+                    if (((struct grupos *)pt)->personas[i].nombre == ' ')
+                    {
+                        ((struct grupos *)pt)->personas[i].nombre = nombre;
+                        ((struct grupos *)pt)->personas[i].grupo = ((struct grupos *)pt)->personas[pos].grupo;
+                        ((struct grupos *)pt)->personas[pos].nombre = ' ';
+                        pos = i;
+                        break;
+                    }
+                }
+                semop(semaforo, singal, 1);
+                wait[0].sem_num = 4;
+                singal[0].sem_num = 4;
+                semop(semaforo, wait, 1);
+                incrementarCuenta();
+                ((struct grupos *)pt)->contador++;
+                semop(semaforo, singal, 1);
             }
         }
     }
@@ -297,6 +328,12 @@ int main(int argc, char const *argv[])
     {
         operacion[0].sem_op = -32;
         semop(semaforo, operacion, 1);
+        operacion[0].sem_op = 1;
+        for (int i = 0; i < 4; i++)
+        {
+            operacion[0].sem_num = i;
+            semop(semaforo, operacion, 1);
+        }
         int solicitudes[13];
         for (int i = 1; i < 13; i++)
         {
