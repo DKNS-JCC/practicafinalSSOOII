@@ -37,7 +37,7 @@ void liberar()
 {
     if (pids[32] == getpid())
     {
-
+        
         for (int i = 0; i < 32; i++)
         {
             kill(pids[i], SIGINT);
@@ -49,7 +49,7 @@ void liberar()
                 perror("Error en wait");
             }
         }
-
+        refrescar();
         printf("%d", finCambios());
 
         if (shmdt(pt) == -1)
@@ -229,66 +229,9 @@ int main(int argc, char const *argv[])
             msg.origen = pos / 10;
             msg.destino = ((struct grupos *)pt)->personas[pos].grupo - 1;
 
-            switch (pos / 10 + 1)
-            {
-            case 1:
-                switch (((struct grupos *)pt)->personas[pos].grupo)
-                {
-                case 2:
-                    msg.tipo = 1;
-                    break;
-                case 3:
-                    msg.tipo = 2;
-                    break;
-                case 4:
-                    msg.tipo = 3;
-                    break;
-                }
-                break;
-            case 2:
-                switch (((struct grupos *)pt)->personas[pos].grupo)
-                {
-                case 1:
-                    msg.tipo = 10;
-                    break;
-                case 3:
-                    msg.tipo = 12;
-                    break;
-                case 4:
-                    msg.tipo = 13;
-                    break;
-                }
-                break;
-            case 3:
-                switch (((struct grupos *)pt)->personas[pos].grupo)
-                {
-                case 1:
-                    msg.tipo = 20;
-                    break;
-                case 2:
-                    msg.tipo = 21;
-                    break;
-                case 4:
-                    msg.tipo = 23;
-                    break;
-                }
-                break;
-            case 4:
-                switch (((struct grupos *)pt)->personas[pos].grupo)
-                {
-                case 1:
-                    msg.tipo = 30;
-                    break;
-                case 2:
-                    msg.tipo = 31;
-                    break;
-                case 3:
-                    msg.tipo = 32;
-                    break;
-                }
-                break;
-            }
-
+            //ESTO SUSTITUYE AL MEGA SWITCH
+            msg.tipo=msg.origen*10+msg.destino;
+            
             // Enviar mensaje solicitando cambio
             if (msgsnd(buzon, &msg, sizeof(struct mensaje) - sizeof(long), IPC_NOWAIT) == -1)
             {
@@ -318,6 +261,7 @@ int main(int argc, char const *argv[])
                     }
                 }
                 semop(semaforo, singal, 1);
+                
                 wait[0].sem_num = 4;
                 singal[0].sem_num = 4;
                 semop(semaforo, wait, 1);
@@ -331,7 +275,9 @@ int main(int argc, char const *argv[])
     {
         operacion[0].sem_op = -32;
         semop(semaforo, operacion, 1);
+        refrescar();
         operacion[0].sem_op = 1;
+        //Iniciar semaforos a 1
         for (int i = 0; i < 4; i++)
         {
             operacion[0].sem_num = i;
@@ -353,21 +299,20 @@ int main(int argc, char const *argv[])
         {
             refrescar();
             msgrcv(buzon, &msg, sizeof(mensaje) - sizeof(long), 0, 0);
-            solicitudes[msg.origen][msg.destino]++;
+            
             if (solicitudes[msg.destino][msg.origen] != 0)
             {
-
-                solicitudes[msg.origen][msg.destino]--;
+               
                 msg.tipo += 100;
                 msgsnd(buzon, &msg, sizeof(mensaje) - sizeof(long), IPC_NOWAIT);
 
                 solicitudes[msg.destino][msg.origen]--;
-                msg.tipo = msg.destino * 10 + msg.origen;
-                msg.tipo += 100;
+                msg.tipo = msg.destino * 10 + msg.origen + 100;
                 msgsnd(buzon, &msg, sizeof(mensaje) - sizeof(long), IPC_NOWAIT);
             }
             else
             {
+                solicitudes[msg.origen][msg.destino]++;
                 fila = msg.origen;
                 while (contador < 4)
                 {
