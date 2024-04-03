@@ -44,6 +44,8 @@ void liberar()
 {
     int i;
     union semun arg;
+    struct sembuf operacion[1];
+   
     if (pids[32] == getpid())
     {
 
