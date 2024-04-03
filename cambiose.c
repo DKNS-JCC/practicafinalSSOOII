@@ -1,4 +1,3 @@
-
 #include <stdio.h>
 #include "cambios.h"
 #include <stdlib.h>
@@ -66,25 +65,33 @@ void liberar()
         {
             perror("Error al liberar memoria compartida");
         }
-        else {
+        else
+        {
             printf("Memoria compartida detach\n");
         }
 
-        shmctl(mem, 0, IPC_RMID); // Liberamos memoria compartida
-        printf("Memoria compartida liberada\n");
-
+        if (shmctl(mem, IPC_RMID, NULL) == -1)
+        {
+            perror("Error al liberar memoria compartida");
+        }
+        else
+        {
+            printf("Memoria compartida liberada\n");
+        }
         if (semctl(semaforo, 0, IPC_RMID, arg) == -1) // Liberamos semáforo
         {
             perror("Error liberando semáforo");
         }
-        else {
+        else
+        {
             printf("Semaforo liberado\n");
         }
-        if (msgctl(buzon, 0, IPC_RMID) == -1) // Liberamos buzon
+        if (msgctl(buzon, IPC_RMID, NULL) == -1) // Liberamos buzon
         {
             perror("Error liberando buzon");
         }
-        else {
+        else
+        {
             printf("Buzon liberado\n");
         }
     }
@@ -94,7 +101,8 @@ void liberar()
         {
             perror("Error al liberar memoria compartida");
         }
-        else {
+        else
+        {
             printf("Memoria compartida detach hijo\n");
         }
     }
@@ -114,8 +122,8 @@ int main(int argc, char const *argv[])
 
     mensaje msg;
 
-    char nombres[32] = {'A', 'B', 'C', 'D', 'a', 'b', 'c', 'd', 'E', 'F', 'G', 'H', 'e', 'f', 'g', 'h', 'I', 'J', 'L', 'M', 'i', 'j', 'l', 'm', 'N', 'O', 
-'P', 'R', 'n', 'o', 'p', 'r'};
+    char nombres[32] = {'A', 'B', 'C', 'D', 'a', 'b', 'c', 'd', 'E', 'F', 'G', 'H', 'e', 'f', 'g', 'h', 'I', 'J', 'L', 'M', 'i', 'j', 'l', 'm', 'N', 'O',
+                        'P', 'R', 'n', 'o', 'p', 'r'};
     struct sembuf operacion[1];
     operacion[0].sem_num = 0;
     operacion[0].sem_op = 0;
@@ -172,7 +180,7 @@ int main(int argc, char const *argv[])
         perror("ERROR AL CREAR BUZON");
 
         shmdt(pt);
-        shmctl(mem, 0, IPC_RMID);
+        shmctl(mem, IPC_RMID, NULL);
         exit(0);
     }
 
@@ -181,18 +189,18 @@ int main(int argc, char const *argv[])
         perror("ERROR AL CREAR SEMAFORO");
 
         shmdt(pt);
-        shmctl(mem, 0, IPC_RMID);
-        msgctl(buzon, 0, IPC_RMID);
+        shmctl(mem, IPC_RMID, NULL);
+        msgctl(buzon, IPC_RMID, NULL);
         exit(0);
     }
 
     // Inicializamos semaforo
-	arg.val = 0;
+    arg.val = 0;
     semctl(semaforo, 0, SETVAL, arg);
     semctl(semaforo, 1, SETVAL, arg);
     semctl(semaforo, 2, SETVAL, arg);
     semctl(semaforo, 3, SETVAL, arg);
-	arg.val = 1;
+    arg.val = 1;
     semctl(semaforo, 4, SETVAL, arg);
 
     pid_t pid;
@@ -338,7 +346,7 @@ int main(int argc, char const *argv[])
             }
             else
             {
-                int j=0,i=0;
+                int j = 0, i = 0;
                 solicitudes[msg.origen][msg.destino]++;
                 fila = msg.origen;
                 while (contador < 4)
@@ -378,7 +386,5 @@ int main(int argc, char const *argv[])
         }
     }
 
-    liberar();
     return 0;
 }
-
