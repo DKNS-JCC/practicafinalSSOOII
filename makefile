@@ -1,5 +1,4 @@
 CC=gcc
-CFLAGS=-Wall -Wextra -std=c99
 
 # Nombre del ejecutable
 TARGET=cambios
@@ -12,7 +11,7 @@ LIBS=libcambios.a
 
 # Regla para compilar el programa
 $(TARGET): $(SRCS) $(LIBS)
-	$(CC) -m32 $(CFLAGS) $(SRCS) $(LIBS) -o $(TARGET) 
+	$(CC) -m32 $(SRCS) $(LIBS) -o $(TARGET) 
 
 # Regla para limpiar archivos temporales y el ejecutable
 clean:
