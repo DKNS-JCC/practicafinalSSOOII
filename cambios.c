@@ -35,56 +35,37 @@ struct grupos
 
 void liberar()
 {
-    int i;
-    
-    struct sembuf operacion[1];
     if (pids[32] == getpid())
     {
         
-        for ( i = 0; i < 32; i++)
+        for (int i = 0; i < 32; i++)
         {
             kill(pids[i], SIGINT);
-            
         }
-        for ( i = 0; i < 32; i++)
+        for (int i = 0; i < 32; i++)
         {
-            
-            if (waitpid(pids[i], NULL, 0) == -1)
+            if (wait(NULL) == -1)
             {
                 perror("Error en wait");
             }
         }
+        refrescar();
+        printf("%d", finCambios());
 
-        finCambios();
-       
         if (shmdt(pt) == -1)
         {
             perror("Error al liberar memoria compartida");
         }
-        else{
-            printf("Memoria liberada \n");
-            fflush(stdout);
-        }
 
-        if(shmctl(mem, 0, IPC_RMID)==-1){
-            perror("Error liberando memoria");
-        } // Liberamos memoria compartida
-        else{
-            printf("Memoria borrada \n");
-        }
+        shmctl(mem, 0, IPC_RMID); // Liberamos memoria compartida
+
         if (semctl(semaforo, 0, IPC_RMID, 0) == -1) // Liberamos semáforo
         {
             perror("Error liberando semáforo");
         }
-        else{
-            printf("Semaforo borrada \n");
-        }
         if (msgctl(buzon, 0, IPC_RMID) == -1) // Liberamos buzon
         {
             perror("Error liberando buzon");
-        }
-        else{
-            printf("Buzon borrado \n");
         }
     }
     else
@@ -93,7 +74,6 @@ void liberar()
         {
             perror("Error al liberar memoria compartida");
         }
-        puts("Hola soy hijo");
     }
     exit(0);
 }
@@ -113,17 +93,17 @@ int main(int argc, char const *argv[])
 
     char nombres[32] = {'A', 'B', 'C', 'D', 'a', 'b', 'c', 'd', 'E', 'F', 'G', 'H', 'e', 'f', 'g', 'h', 'I', 'J', 'L', 'M', 'i', 'j', 'l', 'm', 'N', 'O', 'P', 'R', 'n', 'o', 'p', 'r'};
     struct sembuf operacion[1];
-    operacion[0].sem_num = 2;
+    operacion[0].sem_num = 0;
     operacion[0].sem_op = 0;
     operacion[0].sem_flg = 0;
 
     struct sembuf wait[1];
-    wait[0].sem_num = 2;
+    wait[0].sem_num = 0;
     wait[0].sem_op = -1;
     wait[0].sem_flg = 0;
 
     struct sembuf singal[1];
-    singal[0].sem_num = 2;
+    singal[0].sem_num = 0;
     singal[0].sem_op = 1;
     singal[0].sem_flg = 0;
 
@@ -134,14 +114,14 @@ int main(int argc, char const *argv[])
     if (argc < 2)
     {
         speed = 0;
-        alarm(7);
+        alarm(20);
     }
     else
     {
         speed = atoi(argv[1]);
         if (speed == 0)
         {
-            alarm(20);
+            alarm(30);
         }
         else
         {
@@ -173,7 +153,7 @@ int main(int argc, char const *argv[])
         exit(0);
     }
 
-    if ((semaforo = semget(IPC_PRIVATE, 3, IPC_CREAT | 0600)) == -1) // Creamos semaforo
+    if ((semaforo = semget(IPC_PRIVATE, 4, IPC_CREAT | 0600)) == -1) // Creamos semaforo
     {
         perror("ERROR AL CREAR SEMAFORO");
 
@@ -182,10 +162,12 @@ int main(int argc, char const *argv[])
         msgctl(buzon, 0, IPC_RMID);
         exit(0);
     }
-    inicioCambios(speed, semaforo, pt);
+
     // Inicializamos semaforo
-    semctl(semaforo, 2, SETVAL, 0);
     
+    semctl(semaforo, 0, SETVAL, 0);
+    semctl(semaforo, 1,SETVAL, 0);
+    semctl(semaforo, 2, SETVAL, 1);
 
     pid_t pid;
 
@@ -194,7 +176,7 @@ int main(int argc, char const *argv[])
             ((struct grupos *)pt)->personas[28].nombre = ((struct grupos *)pt)->personas[29].nombre =
                 ((struct grupos *)pt)->personas[38].nombre = ((struct grupos *)pt)->personas[39].nombre = ' ';
 
-    
+    inicioCambios(speed, semaforo, pt);
     i = 0;
     char nombre;
 
@@ -238,18 +220,21 @@ int main(int argc, char const *argv[])
             ((struct grupos *)pt)->personas[i + 6].grupo = 4;
             pos = i + 6;
         }
+        singal[0].sem_num=1;
+        semop(semaforo, singal, 1);
 
-        
         while (1)
-        {
-            
+        {   
+            singal[0].sem_num=0;
+            wait[0].sem_num=0;
+            semop(semaforo,wait,1);
             ((struct grupos *)pt)->personas[pos].grupo = aQuEGrupo(pos / 10 + 1);
+            semop(semaforo,singal,1);
             msg.origen = pos / 10;
             msg.destino = ((struct grupos *)pt)->personas[pos].grupo - 1;
-            semop(semaforo, singal, 1);
-            // ESTO SUSTITUYE AL MEGA SWITCH
-            msg.tipo = msg.origen * 10 + msg.destino;
 
+            msg.tipo=msg.origen*10+msg.destino;
+            
             // Enviar mensaje solicitando cambio
             if (msgsnd(buzon, &msg, sizeof(struct mensaje) - sizeof(long), IPC_NOWAIT) == -1)
             {
@@ -262,9 +247,10 @@ int main(int argc, char const *argv[])
                 perror("Error al recibir el mensaje");
                 exit(1);
             }
-            else    
+            else
             {
-               
+                wait[0].sem_num = 0;
+                singal[0].sem_num = 0;
                 semop(semaforo, wait, 1);
                 for (int i = ((struct grupos *)pt)->personas[pos].grupo * 10 - 10; i < ((struct grupos *)pt)->personas[pos].grupo * 10; i++)
                 {
@@ -277,7 +263,11 @@ int main(int argc, char const *argv[])
                         break;
                     }
                 }
-                   
+                semop(semaforo, singal, 1);
+                
+                wait[0].sem_num = 2;
+                singal[0].sem_num = 2;
+                semop(semaforo, wait, 1);
                 incrementarCuenta();
                 ((struct grupos *)pt)->contador++;
                 semop(semaforo, singal, 1);
@@ -286,12 +276,15 @@ int main(int argc, char const *argv[])
     }
     else // Proceso padre
     {
+        
         operacion[0].sem_op = -32;
+        operacion[0].sem_num = 1;
         semop(semaforo, operacion, 1);
         refrescar();
-       
-        // Iniciar semaforos a 1
+        
+        singal[0].sem_num=0;
         semop(semaforo,singal,1);
+       
         int solicitudes[4][4];
         for (int i = 0; i < 4; i++)
         {
@@ -300,18 +293,18 @@ int main(int argc, char const *argv[])
                 solicitudes[i][j] = 0;
             }
         }
-        int contador = 0;
-        int multiple[4] = {0, 0, 0, 0};
-        int fila = 0;
+        int contador=0;
+        int multiple[4]={0,0,0,0};
+        int fila=0;
         int bandera = 1;
         while (1)
         {
             refrescar();
             msgrcv(buzon, &msg, sizeof(mensaje) - sizeof(long), 0, 0);
-
+            
             if (solicitudes[msg.destino][msg.origen] != 0)
             {
-
+               
                 msg.tipo += 100;
                 msgsnd(buzon, &msg, sizeof(mensaje) - sizeof(long), IPC_NOWAIT);
 
@@ -327,7 +320,7 @@ int main(int argc, char const *argv[])
                 {
                     for (int j = 0; j < 4; j++)
                     {
-
+                        
                         if (solicitudes[fila][j] != 0)
                         {
                             multiple[contador] = fila * 10 + j;
@@ -349,7 +342,7 @@ int main(int argc, char const *argv[])
                 {
                     for (int i = 0; i <= contador; i++)
                     {
-                        msg.tipo = multiple[i] + 100;
+                        msg.tipo = multiple[i]+100;
                         solicitudes[multiple[i] / 10][multiple[i] % 10]--;
                         msgsnd(buzon, &msg, sizeof(mensaje) - sizeof(long), IPC_NOWAIT);
                     }
