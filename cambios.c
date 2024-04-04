@@ -153,7 +153,7 @@ int main(int argc, char const *argv[])
         exit(0);
     }
 
-    if ((semaforo = semget(IPC_PRIVATE, 4, IPC_CREAT | 0600)) == -1) // Creamos semaforo
+    if ((semaforo = semget(IPC_PRIVATE, 3, IPC_CREAT | 0600)) == -1) // Creamos semaforo
     {
         perror("ERROR AL CREAR SEMAFORO");
 
@@ -242,13 +242,9 @@ int main(int argc, char const *argv[])
                 exit(1);
             }
             // Recibir mensaje bloqueante
-            if (msgrcv(buzon, &msg, sizeof(struct mensaje) - sizeof(long), msg.tipo + 100, 0) == -1)
-            {
-                perror("Error al recibir el mensaje");
-                exit(1);
-            }
-            else
-            {
+            msgrcv(buzon, &msg, sizeof(struct mensaje) - sizeof(long), msg.tipo + 100, 0);
+            
+        
                 wait[0].sem_num = 0;
                 singal[0].sem_num = 0;
                 semop(semaforo, wait, 1);
@@ -272,7 +268,7 @@ int main(int argc, char const *argv[])
                 ((struct grupos *)pt)->contador++;
                 semop(semaforo, singal, 1);
             }
-        }
+        
     }
     else // Proceso padre
     {
