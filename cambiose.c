@@ -132,24 +132,24 @@ int main(int argc, char const *argv[])
     char nombres[32] = {'A', 'B', 'C', 'D', 'a', 'b', 'c', 'd', 'E', 'F', 'G', 'H', 'e', 'f', 'g', 'h', 'I', 'J', 'L', 'M', 'i', 'j', 'l', 'm', 'N', 'O', 'P', 'R', 'n', 'o', 'p', 'r'};
     
     struct sembuf operacion[1];
-    operacion[0].sem_num = 0;
+    operacion[0].sem_num = 1;
     operacion[0].sem_op = 0;
     operacion[0].sem_flg = 0;
 
     struct sembuf wait[1];
-    wait[0].sem_num = 0;
+    wait[0].sem_num = 1;
     wait[0].sem_op = -1;
     wait[0].sem_flg = 0;
 
     struct sembuf singal[1];
-    singal[0].sem_num = 0;
+    singal[0].sem_num = 1;
     singal[0].sem_op = 1;
     singal[0].sem_flg = 0;
 
     u.pids[32] = getpid();
     char alonso = 'A'; //<-- No se usa
     int speed = 0;
-    int i;
+    int i,j;
 
     if (argc < 2)
     {
@@ -195,7 +195,7 @@ int main(int argc, char const *argv[])
         exit(0);
     }
 
-    if ((u.semaforo = semget(IPC_PRIVATE, 7, IPC_CREAT | 0600)) == -1) // Creamos semaforo
+    if ((u.semaforo = semget(IPC_PRIVATE, 2, IPC_CREAT | 0600)) == -1) // Creamos semaforo
     {
         perror("ERROR AL CREAR SEMAFORO");
 
@@ -209,12 +209,7 @@ int main(int argc, char const *argv[])
 
     arg.val = 0;
     semctl(u.semaforo, 1, SETVAL, arg);
-    semctl(u.semaforo, 2, SETVAL, arg);
-    semctl(u.semaforo, 3, SETVAL, arg);
-    semctl(u.semaforo, 4, SETVAL, arg);
-    semctl(u.semaforo, 6, SETVAL, arg);
-    arg.val = 1;
-    semctl(u.semaforo, 5, SETVAL, arg);
+    
     
 
     pid_t pid;
@@ -272,9 +267,8 @@ int main(int argc, char const *argv[])
             ((struct grupos *)u.pt)->personas[i + 6].grupo = 4;
             pos = i + 6;
         }
-        singal[0].sem_num=6;
         semop(u.semaforo, singal, 1);
-        int i;
+        
         while (u.flag)
         {
             u.flag=1;
@@ -305,9 +299,8 @@ int main(int argc, char const *argv[])
             {
 
                 u.flag=2;
-                wait[0].sem_num = ((struct grupos *)u.pt)->personas[pos].grupo;
-                singal[0].sem_num = ((struct grupos *)u.pt)->personas[pos].grupo;
-                semop(u.semaforo, wait, 1);
+                
+                
                 
                 for (i = ((struct grupos *)u.pt)->personas[pos].grupo * 10 - 10; i < ((struct grupos *)u.pt)->personas[pos].grupo * 10; i++)
                 {
@@ -320,32 +313,24 @@ int main(int argc, char const *argv[])
                         break;
                     }
                 }
-                semop(u.semaforo, singal, 1);
-
-                wait[0].sem_num = 5;
-                singal[0].sem_num = 5;
-                semop(u.semaforo, wait, 1);
+                
                 incrementarCuenta();
                 ((struct grupos *)u.pt)->contador++;
-                semop(u.semaforo, singal, 1);
+                msg.tipo=msg.tipo+100;
+                msgsnd(u.buzon, &msg, sizeof(mensaje) - sizeof(long), IPC_NOWAIT);
                 
             }
         }
     }
     else // Proceso padre
     {
-        int i,j;
+        
         operacion[0].sem_op = -32;
-        operacion[0].sem_num = 6;
+        operacion[0].sem_num = 1;
         semop(u.semaforo, operacion, 1);
         refrescar();
         
-        // Iniciar semaforos a 1
-        for (i = 0; i < 4; i++)
-        {
-            singal[0].sem_num = i + 1;
-            semop(u.semaforo, singal, 1);
-        }
+    
         int solicitudes[4][4];
         for (i = 0; i < 4; i++)
         {
@@ -366,13 +351,14 @@ int main(int argc, char const *argv[])
 
             if (solicitudes[msg.destino][msg.origen] != 0)
             {
-
+                
                 msg.tipo += 100;
                 msgsnd(u.buzon, &msg, sizeof(mensaje) - sizeof(long), IPC_NOWAIT);
-
+                msgrcv(u.buzon, &msg, sizeof(struct mensaje) - sizeof(long), msg.tipo+100,0);
                 solicitudes[msg.destino][msg.origen]--;
                 msg.tipo = msg.destino * 10 + msg.origen + 100;
                 msgsnd(u.buzon, &msg, sizeof(mensaje) - sizeof(long), IPC_NOWAIT);
+                msgrcv(u.buzon, &msg, sizeof(struct mensaje) - sizeof(long), msg.tipo+100, 0);
             }
             else
             {
@@ -407,6 +393,7 @@ int main(int argc, char const *argv[])
                         msg.tipo = multiple[i] + 100;
                         solicitudes[multiple[i] / 10][multiple[i] % 10]--;
                         msgsnd(u.buzon, &msg, sizeof(mensaje) - sizeof(long), IPC_NOWAIT);
+                        msgrcv(u.buzon, &msg, sizeof(struct mensaje) - sizeof(long), msg.tipo+100, 0);
                     }
                 }
             }
